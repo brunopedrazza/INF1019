@@ -1,0 +1,284 @@
+Gerald Cohn – 1711601
+Bruno Pedrazza – 1412933
+
+
+Segundo Trabalho de Sistemas de Computação – INF 1019
+
+-----------------------------------------------------
+Compilação:	
+
+É necessária a compilação do servidor e do cliente baseados nos protocolos de comunicação udp pedidos em terminais diferentes. O server (udpServer.c) fica na pasta SFS-root-di, que funcionará como pasta root para criação dos arquivos e diretórios solicitados pelo client (udpClient.c) que fica em qualquer outra pasta.
+
+gcc —Wall -o server udpserver.c
+gcc —Wall -o cliente udpclient.c
+
+-----------------------------------------------------
+Execução:	
+
+Terminal 1:
+./server 3999 &
+
+Terminal 2:
+./cliente localhost 3999
+
+-----------------------------------------------------
+Uso
+
+Comunicação entre cliente e servidor: cliente requisita os comandos especificados no enunciado do trabalho para o server, por meio do protocolo udp (REQ) e server executa a ação e responde a mensagem correspondente ao cliente(REP)
+
+Em questão de comunicação foi criado um internet address para comunicar o server com o cliente através do socket com uma porta. O socket é criado (build), ligado (bind), e setado para receber (recvfrom) e enviar (sendto) dados.
+
+-Lista de comandos válidos requisitados pelo cliente com respectivos parâmetros:
+
+	WR-­REQ,path(string),strlen(int),payload(string),nrbytes(int),offset(int),user(int),perms(char[2])
+	RD-­‐REQ,path(string),strlen(int),payload(stringvazio),nrbytes(int),offset(int),user(int)
+	FI-­REQ,path(string),strlen(int)
+
+	DC-­REQ,path(string),strlen(int), dirname(string),strlen(int),user(int),permission(char[2])
+	DR‐REQ,path(string),strlen(int),dirname(string),strlen(int),user(int)
+	DL­‐REQ,path(string),strlen(int),user(int)
+
+-Lista das respectivas respostas do server com parâmetros:
+
+	WR-­REP,path(string),strlen(int),payload(string vazio),nrbytes escritos (int),offset(int)
+	RD-­‐REP,path(string),strlen(int),payload(string),nrbytes lidos (int),offset(int)
+	FI-­REP,path(string),strlen(int),owner(string),permissions(2 char),filelenght(int)
+
+	DC-­REP,path(string),strlen(int)
+	DR‐REP,path(string),strlen(int)
+	DL­‐REP,allfilenames (string), fstlstpositions (array[40] of struct {int, int}), nrnames (int)
+
+
+O diretório root foi identificado pelo “ “ para ser representado sozinho, com strlen(path)=1. Isso é utilizado por exemplo para criar um diretório com DC-REQ na pasta root. Para escrever um arquivo no root, entretanto, escrevemos somente o nome do arquivo sem a “/” anterior, o que é tratado dentro do código.
+
+Inicialmente dentro da pasta root, além do arquivo udpserver.c, são necessários outros dois arquivos padrão enviados por email também: cabecalho_instrucoes.txt e o cabecalho_dir.txt, que não podem ser modificados. Suas funções são explicadas no próximo parágrafo.
+
+A forma escolhida para guardar às meta-informações no nosso sistema de arquivos do servidor foi a criação de um cabeçalho nos primeiros bytes do arquivo. A estrutura do mesmo consiste em 4 bytes para guardar o tamanho da meta-informação criada dinamicamente, do path, strlen(path), dono e permissões de acesso como explicado no arquivo cabecalho_instrucoes.txt. Nos diretórios, as mesmas informações são guardadas em um arquivo criado com nome path/cabecalho_dir.txt, com o path respectivo. Esse cabeçalho é utilizado para validar as operações quanto as permissões de acesso, testadas em dois bytes um para o próprio user e outro para outros usuários. Dentre as possibilidades sempre escritas com letra maiúscula 
+'W' - Permissão de escrita e leitura; 	'R' - Permissão de leitura;		 ‘B’ - Bloqueado (não escreve, nem lê)
+
+Algumas funções auxiliares de bibliotecas padrão, como a <string.h>, foram utilizadas:
+	-strcpy para cópia de strings;
+	-strcat para concatenação de strings
+	-strtok para quebrar a string passada entre o separador dado no parâmetro
+	-lseek para mudar a posição do ponteiro para escrita ou leitura no arquivo
+	-Para arquivos open, close, pread, write, unlink, 
+	-Para diretórios mkdir,rmdir, opendir, readdir, scandir, closedir
+	-printf, sprintf, snprintf para impressões com formatos e locais específicos
+	-struct stat para obtenção do tamanho do arquivo
+
+Além disso, foram implementadas diversas condições de erro para os mais diversos parâmetros, com a impressão do respectivo erro na tela, conforme comentado no código.
+
+
+-----------------------------------------------------
+Testes Realizados sempre para uma chamada na root e outra em algum subdiretório diferente
+
+WR-REQ - Criar arquivo novo, escrever no arquivo (em posição específica e com offset maior que o arquivo para concatenar no final), apagar arquivo com nrbytes=0.
+RD-REQ - Lê conteúdo do arquivo
+FI-REQ - Verifica informações do arquivo
+DC-REQ - Criar diretorio
+DR-REQ - Remoção de diretório
+DL-REQ - Lista arquivos presentes no diretório
+
+Além disso para cada comando foram testadas condições de acesso pelo próprio user e por outros usuários para verificar o correto funcionamento das permissões
+
+-----------------------------------------------------
+Exemplos de Execução
+
+DC-REQ:
+
+Client:
+Please enter cmd: DC-REQ, ,0,dir1,4,20,WW
+Echo from server: DC-REP, dir1, 4
+
+Server:
+Comandos[0]: DC-REQ
+Comandos[1]:  
+Comandos[2]: 0
+Comandos[3]: dir1
+Comandos[4]: 4
+Comandos[5]: 20
+Comandos[6]: WW
+
+str: dir1
+w: 38
+Feedback: DC-REP, dir1, 4
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 15/24 bytes: DC-REP, dir1, 4
+
+
+DR-REQ:
+
+Client:
+Please enter cmd: DR-REQ,dir1,4,dir11,5,20   
+Echo from server: DR-REP,dir1,4
+
+Server:
+Comandos[0]: DR-REQ
+Comandos[1]: dir1
+Comandos[2]: 4
+Comandos[3]: dir11
+Comandos[4]: 5
+Comandos[5]: 20
+
+Bytes lidos : 4
+Tamanho meta-informação: 44
+Permissão concedida - owner
+dir1/dir11/cabecalho_dir.txt is a file.
+Diretorio 'dir1/dir11' deletado com sucesso
+Feedback: DR-REP,dir1,4
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 13/25 bytes: DR-REP,dir1,4
+
+
+DL-REQ:
+
+Client:
+Please enter cmd: DL-REQ, ,0,20
+Echo from server: DL-REP,cabecalho_dir.txtcabecalho_instrucoes.txtdir1serverudpserver.c,0 16 17 40 41 44 45 50 51 61
+
+Server:
+Comandos[0]: DL-REQ
+Comandos[1]:  
+Comandos[2]: 0
+Comandos[3]: 20
+Instrução DL-REQ
+Bytes lidos : 4
+Tamanho meta-informação: 36
+Permissão concedida - guest
+Permissão de leitura concedida
+Quantidade de entradas: 5Feedback: DL-REP,cabecalho_dir.txtcabecalho_instrucoes.txtdir1serverudpserver.c,0 16 17 40 41 44 45 50 51 61 
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 99/14 bytes: DL-REP,cabecalho_dir.txtcabecalho_instrucoes.txtdir1serverudpserver.c,0 16 17 40 41 44 45 50 51 61 
+
+WR-REQ: (Criação de arquivo)
+
+Client:
+Please enter cmd: WR-REQ,arq1.txt,8,BrunoGerald,11,0,20,WW
+Echo from server: WR-REP,arq1.txt,8, ,11,0
+
+Server:
+Comandos[0]: WR-REQ
+Comandos[1]: arq1.txt
+Comandos[2]: 8
+Comandos[3]: BrunoGerald
+Comandos[4]: 11
+Comandos[5]: 0
+Comandos[6]: 20
+Comandos[7]: WW
+Path para o diretório:cabecalho_dir.txt
+Bytes lidos : 4
+Tamanho meta-informação: 36
+Permissão concedida - guest
+w: 23
+path: arq1.txt, nrbytes: 11, offset 0, payload BrunoGerald,
+Tamanho da meta-informação: 23
+Feedback: WR-REP,arq1.txt,8, ,11,0
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 24/41 bytes: WR-REP,arq1.txt,8, ,11,0
+
+
+WR-REQ: (Exclusão de arquivo)
+
+Client:
+Please enter cmd: WR-REQ,arq1.txt,8, ,0,0,20,WW
+Echo from server: WR-REP,arq1.txt,8, ,-1,0
+
+Server:
+Comandos[0]: WR-REQ
+Comandos[1]: arq1.txt
+Comandos[2]: 8
+Comandos[3]:  
+Comandos[4]: 0
+Comandos[5]: 0
+Comandos[6]: 20
+Comandos[7]: WW
+Path para o diretório:cabecalho_dir.txt
+Bytes lidos : 4
+Tamanho meta-informação: 36
+Permissão concedida - guest
+Bytes lidos : 4
+Tamanho meta-informação: 23
+Permissão concedida - owner
+Excluindo arq1.txt
+Feedback: WR-REP,arq1.txt,8, ,-1,0
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 24/30 bytes: WR-REP,arq1.txt,8, ,-1,0
+
+
+RD-REQ:
+
+Client:
+Please enter cmd: RD-REQ,arq1.txt,8, ,11,0,20,WW
+Echo from server: RD-REP,arq1.txt,8,BrunoGerald,11,0
+
+Server:
+Comandos[0]: RD-REQ
+Comandos[1]: arq1.txt
+Comandos[2]: 8
+Comandos[3]:  
+Comandos[4]: 11
+Comandos[5]: 0
+Comandos[6]: 20
+Comandos[7]: WW
+Path para o diretório:cabecalho_dir.txt
+Bytes lidos : 4
+Tamanho meta-informação: 36
+Permissão concedida - guest
+Bytes lidos : 4
+Tamanho meta-informação: 23
+Permissão concedida - owner
+Numero de bytes: 11
+RD-REP,arq1.txt,8,BrunoGerald,11,0
+Feedback: RD-REP,arq1.txt,8,BrunoGerald,11,0
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 34/31 bytes: RD-REP,arq1.txt,8,BrunoGerald,11,0
+
+
+FI-REQ:
+
+Client:
+Please enter cmd: FI-REQ,arq1.txt,8
+Echo from server: FI-REP,arq1.txt,8,20,'WW',34
+
+
+Server:
+Comandos[0]: FI-REQ
+Comandos[1]: arq1.txt
+Comandos[2]: 8
+Bytes lidos : 4
+Tamanho da meta-informação: 23
+Feedback: FI-REP,arq1.txt,8,20,'WW',34
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 28/18 bytes: FI-REP,arq1.txt,8,20,'WW',34
+
+
+
+Teste com permissão negada (criação de arquivo para leitura de outros usuários e tenta modificar)
+
+Client:
+Please enter cmd: WR-REQ,dir1/dir11/arq111.txt,21,BrunoGerald,11,0,20,WR
+Echo from server: WR-REP,dir1/dir11/arq111.txt,21, ,11,0
+
+Please enter cmd: WR-REQ,dir1/dir11/arq111.txt,21,LAB,3,0,21,WW
+Echo from server: WR-REP,dir1/dir11/arq111.txt,21, ,-1,0
+
+Server:
+Comandos[0]: WR-REQ
+Comandos[1]: dir1/dir11/arq111.txt
+Comandos[2]: 21
+Comandos[3]: LAB
+Comandos[4]: 3
+Comandos[5]: 0
+Comandos[6]: 21
+Comandos[7]: WW
+Path para o diretório:dir1/dir11/cabecalho_dir.txt
+Bytes lidos : 4
+Tamanho meta-informação: 44
+Permissão concedida - guest
+Bytes lidos : 4
+Tamanho meta-informação: 37
+ERRO - Sem permissão de escrita no arquivo
+Feedback: WR-REP,dir1/dir11/arq111.txt,21, ,-1,0
+server received datagram from localhost.localdomain (127.0.0.1)
+server received 38/46 bytes: WR-REP,dir1/dir11/arq111.txt,21, ,-1,0
+

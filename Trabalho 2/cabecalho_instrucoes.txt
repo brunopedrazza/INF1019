@@ -1,0 +1,15 @@
+XXXX,path(string),strlen(path) (int),owner(int),permissions(2 char),
+
+
+Permission constituído de 2 bytes o primeiro para permissão do próprio user e o segundo para a permissão de acesso para outros usuários. Podem ser utilizadas as letras maiúsculas:
+
+'W' - Permissão de escrita e leitura;
+'R' - Permissão de leitura;
+‘B’ - Bloqueado (não escreve nem lê do arquivo)
+
+
+Exemplo de uso:
+
+0029,exemplo.txt,11,1111,WR,
+
+o arquivo exemplo.txt, foi criado pelo user  1111 e pela permissão WR pode ser lido e sobrescrito pelo próprio dono, mas só lido por outros usuários.
