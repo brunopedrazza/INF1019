@@ -1,0 +1,330 @@
+Bruno Pedrazza – 1412933
+Gerald Cohn – 1711601
+
+1) 
+   Faça um programa para criar dois processos que se comunicam via pipe. O Pai lê do pipeenquanto o filho escreve no pipe. Exiba o resultado do que foi escrito e lido.
+   
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+int main (void) { 
+   int fd[2];
+   int nr, nw;
+   
+   char text[] = "Bom dia.";
+   char* textR = (char *)malloc(strlen(text) * sizeof (char));
+   
+   if (pipe(fd) < 0){
+      puts ("Erro ao abrir os pipes"); 
+      exit (-1);
+   }
+    
+   if (fork() == 0) { 
+      close(fd[0]); 
+      nw = write(fd[1], text, strlen(text));
+      printf("%d dados escritos\n", nw);
+   } 
+   
+   else {  
+      close(fd[1]); 
+      nr = read(fd[0], textR, sizeof(textR));  
+      printf("%s\n",textR);
+      printf("%d dados lidos\n", nr);
+   }
+   
+   close(fd[0]);
+   close(fd[1]);
+   free(textR);
+
+   return 0;
+}
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex1 ex1.c
+$ ./ex1
+
+-----------------------------------------------------
+RESULTADO
+
+8 dados escritos
+Bom dia.
+8 dados lidos
+
+
+-----------------------------------------------------
+CONCLUSÃO
+	
+	Através da função write, o filho escreve a mensagem de "Bom dia." no pipe, é mostrado no terminal quantos dados foram escritos (retorno da função write). Por sua vez, o pai lê essa mensagem através da função read do pipe escrita pelo filho e exibe no terminal, mostrando também a quantidade de dados lidos (retorno da função read).
+
+_______________________________________________________________________________________________________
+ 
+2)
+ Faça um programa para redirecionar a entrada e a saída, lendo os dados de um arquivo e gerando a saída em outro. 
+ 
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
+#define N 50
+
+
+int main(void) {
+
+   int entrada, saida;
+   /* descritor a ser duplicado  */
+   int retorno;
+   /* valor de retorno de dup  */
+   int retorno2;
+   /* valor de retorno de dup2 */
+   char str[N];
+   
+   if ((entrada=open("entrada",O_RDWR|O_CREAT,0666)) == -1) { 
+      perror("Error open()"); 
+      return -1; 
+   }
+   
+   
+   if ((saida=open("saida",O_RDWR|O_CREAT|O_TRUNC,0666)) == -1) { 
+      perror("Error open()"); 
+      return -1; 
+   } 
+   
+   close(0);
+   /* fechamento da entrada stdin */
+   
+   if ((retorno = dup(entrada)) == -1) {
+      /* duplicacao de stdin (menor descritor fechado) */
+      perror("Error dup()"); 
+      return -2; 
+   }
+   
+   scanf(" %[^\n]20s",str);
+   close(0);
+    
+   if ((retorno2 = dup2(saida,1)) == -1) {
+      /* duplicacao de stdout */
+      perror("Error dup2()"); 
+      return -3; 
+   }
+   
+   printf("%s\n",str);
+   
+   return 0; 
+} 
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex2 ex2.c
+$ ./ex2
+
+-----------------------------------------------------
+RESULTADO
+
+	O texto que estava no arquivo "entrada" foi copiado para um arquivo "saida" gerado pelo programa.
+
+-----------------------------------------------------
+CONCLUSÃO
+
+	
+
+   
+__________________________________________________________________________________________
+   
+3) 
+  Faça um programa para criar um pipe e executar dois processos que são utilitários do Unix que se comuniquem através do pipe criado, assim como a shell faz.
+  
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
+int main (void) { 
+   int fd[2];
+   int entrada;
+   pid_t pid;
+   
+   if (pipe(fd) < 0){
+      puts ("Erro ao abrir os pipes"); 
+      exit (-1);
+   }
+   
+   if ((entrada=open("arqex3",O_RDWR|O_CREAT,0666)) == -1) { 
+      perror("Error open()"); 
+      return -1; 
+   }
+   
+   if((pid = fork()) < 0){
+      printf("Erro ao abrir fork\n");
+      exit(1);
+   
+   }
+   
+   else if (fork() == 0) { 
+      dup2(fd[1],1);
+      printf("ls\n");
+      char *argv[] = {"ls", NULL};
+      execv("/bin/ls",argv);
+      printf("Falha ao executar ls\n");
+      exit(1);
+   } 
+   
+   else {
+      int aux;  
+      close(fd[1]);
+      waitpid(pid,&aux,0);
+      close(0);
+      dup2(fd[0],0);
+      dup2(entrada,1);
+      printf("wc\n");
+      char *argv[] = {"wc", NULL};
+      execv("/usr/bin/wc",argv);
+      printf("Falha ao executar wc\n");
+      exit(1);
+   }
+   
+   close(fd[0]);
+   close(fd[1]);
+   return 0;
+}
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex3 ex3.c
+$ ./ex3
+
+
+-----------------------------------------------------
+RESULTADO
+
+
+
+
+-----------------------------------------------------
+CONCLUSÃO
+
+	
+	
+	
+	__________________________________________________________________________________________
+   
+4) 
+  Faça um programa que cria dois processos leitores e um processo escritor em uma mesma pipe. Faça o escritor dormir metade do tempo dos leitores, e mostre como os leitores consomem os dados produzidos pelo escritor.  
+    
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+int main (void) { 
+   int fd[2];
+   int n;
+   
+   if (pipe(fd) < 0){
+      puts ("Erro ao abrir os pipes"); 
+      exit (-1);
+   }
+   
+   if (fork() == 0) {
+      close(fd[1]);
+      while (1){ 
+         read(fd[0], &n, sizeof(int));
+         printf("Filho1 : %d\n",n);
+         sleep(2);
+      }
+   }
+   
+   else {
+      if (fork() == 0) {
+         close(fd[1]);
+         while (1){
+            read(fd[0], &n, sizeof(int));
+            printf("Filho2 : %d\n",n);
+            sleep(2);
+         }
+      }
+
+      else {
+         n = 0; 
+         close(fd[0]);
+         while (1){ 
+            write(fd[1], &n, sizeof(int));
+            n += 5;
+            sleep(1);
+         } 
+      }
+   }
+   
+   close(fd[0]);
+   close(fd[1]);
+
+   return 0;
+}
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex4 ex4.c
+$ ./ex4
+
+-----------------------------------------------------
+RESULTADO
+
+Filho1 : 0
+Filho2 : 5
+Filho1 : 10
+Filho2 : 15
+Filho1 : 20
+Filho2 : 25
+Filho1 : 30
+Filho2 : 35
+Filho1 : 40
+Filho2 : 45
+Filho1 : 50
+Filho2 : 55
+Filho1 : 60
+Filho2 : 65
+Filho1 : 70
+Filho2 : 75
+Filho1 : 80
+Filho2 : 85
+Filho1 : 90
+Filho2 : 95
+Filho1 : 100
+.... (continua)
+
+
+-----------------------------------------------------
+CONCLUSÃO
+	
+	O programa cria um pai com dois filhos. O pai fica responsável por somar 5 ao valor do inteiro escrevendo no pipe, enquanto os filhos apenas leem do pipe esse inteiro e imprimem no terminal alternadamente devido aos sleeps.
+

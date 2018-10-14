@@ -1,0 +1,605 @@
+Bruno Pedrazza – 1412933
+Gerald Cohn – 1711601
+
+1) 
+Use o programa listaarquivo.c para imprimir o numero de inode, o tamanho (em bytes) e a idade em dias de cada arquivo do diretório corrente. Lembre-se que stat() espera o path completo do arquivo.
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <sys/types.h> 
+#include <sys/dir.h> 
+#include <sys/param.h> 
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define FALSE 0 
+#define TRUE 1 
+
+extern  int alphasort(); 
+char pathname[MAXPATHLEN];
+
+
+int file_select(struct direct   *entry) 
+{ 
+    if ((strcmp(entry->d_name, ".") == 0) || (strcmp(entry->d_name, "..") == 0))  
+          return (FALSE); 
+    else 
+          return (TRUE); 
+} 
+
+int main(void)  {  
+   int count, i; 
+   struct direct **files; 
+   int file_select();
+   struct stat *buf;
+   char pathnameaux[MAXPATHLEN];
+   
+   if (getcwd(pathname,MAXPATHLEN) == NULL )  {  printf("Error getting path\n"); exit(0); } 
+   printf("Current Working Directory = %s\n",pathname); 
+   count = scandir( pathname, &files, file_select, alphasort); 
+   
+   /* If no files found, make a non-selectable menu item */ 
+   if (count <= 0) {
+      printf("No files in this directory\n"); exit(0); 
+   } 
+   printf("Number of files = %d\n",count);
+    
+   for (i=1;i<count+1;++i) {
+      strcpy(pathnameaux,pathname);
+      printf("%s\t", files[i-1]->d_name);
+      strcat(pathnameaux,"/");
+      strcat(pathnameaux,files[i-1]->d_name);
+      if (stat(pathnameaux,buf) != 0) printf("Erro.\n");
+      else{
+         printf("inode: %d\t",buf->st_ino);
+         printf("size: %d\t",buf->st_size);
+         printf("age: %d days\n",(time(NULL) - (buf->st_mtime))/86400);
+         // 86400 segundos em 1 dia
+      }
+   }
+   
+   printf("\n"); /* flush buffer */
+   return 0; 
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o listaarquivosex1 listaarquivosex1.c
+$ ./listaarquivosex1
+
+-----------------------------------------------------
+RESULTADO
+
+Current Working Directory = /home/aluno/inf1019/lab09
+Number of files = 7
+Laboratorio9.txt	inode: 272854	size: 3825	age: 0 days
+labarquivo.txt	inode: 272828	size: 6141	age: 0 days
+listaarquivos	inode: 264425	size: 9216	age: 0 days
+listaarquivosex1	inode: 272859	size: 9224	age: 0 days
+listaarquivosex1.c	inode: 271430	size: 1659	age: 0 days
+listaarquivosex2.c	inode: 272754	size: 1623	age: 0 days
+listaarquivosex3.c	inode: 271679	size: 1745	age: 0 days
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+
+
+
+
+_______________________________________________________________________________________________________
+
+2) 
+Modifique o programa anterior para mostrar o número de links que cada arquivo possui. Depois, no diretório corrente, execute o o comando da shell ln <arquivo> <nomeLink> e veja o que mudou na saída de seu programa.
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <sys/types.h> 
+#include <sys/dir.h> 
+#include <sys/param.h> 
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define FALSE 0 
+#define TRUE 1
+
+
+extern  int alphasort(); 
+char pathname[MAXPATHLEN];
+
+
+int file_select(struct direct *entry) 
+{ 
+    if ((strcmp(entry->d_name, ".") == 0) || (strcmp(entry->d_name, "..") == 0))  
+          return (FALSE); 
+    else 
+          return (TRUE); 
+} 
+
+int main(void)  {  
+   int count, i; 
+   struct direct **files; 
+   int file_select();
+   struct stat *buf;
+   char pathnameaux[MAXPATHLEN];
+   
+   if (getcwd(pathname,MAXPATHLEN) == NULL )  {  printf("Error getting path\n"); exit(0); } 
+   printf("Current Working Directory = %s\n",pathname); 
+   count = scandir( pathname, &files, file_select, alphasort); 
+   
+   /* If no files found, make a non-selectable menu item */ 
+   if (count <= 0) {
+      printf("No files in this directory\n"); exit(0); 
+   } 
+   printf("Number of files = %d\n",count);
+    
+   for (i=1;i<count+1;++i) {
+      strcpy(pathnameaux,pathname);
+      printf("%s\t", files[i-1]->d_name);
+      strcat(pathnameaux,"/");
+      strcat(pathnameaux,files[i-1]->d_name);
+      if (stat(pathnameaux,buf) != 0) printf("Erro.\n");
+      else{
+         printf("inode: %d\t",buf->st_ino);
+         printf("size: %d\t",buf->st_size);
+         printf("age: %d days\t",(time(NULL) - (buf->st_mtime))/86400);
+         // 86400 segundos em 1 dia
+         printf("n links: %d\n",buf->st_nlink);
+      }
+   }
+   
+   printf("\n"); /* flush buffer */
+   return 0; 
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o listaarquivosex2 listaarquivosex2.c
+$ ./listaarquivosex2
+$ ln listaarquivosex2 ex2lab09
+$ ./ex2lab09
+
+-----------------------------------------------------
+RESULTADO
+
+Execucao listaarquivosex2:
+Number of files = 8
+Laboratorio9.txt	inode: 272827	size: 4345	age: 0 days	n links: 1
+labarquivo.txt	inode: 272828	size: 6141	age: 0 days	n links: 1
+listaarquivos	inode: 264425	size: 9216	age: 0 days	n links: 1
+listaarquivosex1	inode: 272859	size: 9224	age: 0 days	n links: 1
+listaarquivosex1.c	inode: 271430	size: 1659	age: 0 days	n links: 1
+listaarquivosex2	inode: 272848	size: 9224	age: 0 days	n links: 1
+listaarquivosex2.c	inode: 272860	size: 1593	age: 0 days	n links: 1
+listaarquivosex3.c	inode: 271679	size: 1745	age: 0 days	n links: 1
+
+Execucao ex2lab09:
+Number of files = 9
+Laboratorio9.txt	inode: 272827	size: 4345	age: 0 days	n links: 1
+ex2lab09	inode: 272848	size: 9224	age: 0 days	n links: 2
+labarquivo.txt	inode: 272828	size: 6141	age: 0 days	n links: 1
+listaarquivos	inode: 264425	size: 9216	age: 0 days	n links: 1
+listaarquivosex1	inode: 272859	size: 9224	age: 0 days	n links: 1
+listaarquivosex1.c	inode: 271430	size: 1659	age: 0 days	n links: 1
+listaarquivosex2	inode: 272848	size: 9224	age: 0 days	n links: 2
+listaarquivosex2.c	inode: 272860	size: 1593	age: 0 days	n links: 1
+listaarquivosex3.c	inode: 271679	size: 1745	age: 0 days	n links: 1
+
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+
+
+
+
+_______________________________________________________________________________________________________
+ 
+3)
+Escreva um programa que percorre recursivamente um diretório, a partir do diretório corrente, somando o tamanho de todos os arquivos encontrados. 
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <sys/types.h> 
+#include <sys/dir.h> 
+#include <sys/param.h> 
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define FALSE 0 
+#define TRUE 1
+
+
+extern  int alphasort(); 
+char pathname[MAXPATHLEN];
+
+
+int file_select(struct direct *entry) 
+{ 
+    if ((strcmp(entry->d_name, ".") == 0) || (strcmp(entry->d_name, "..") == 0))  
+          return (FALSE); 
+    else 
+          return (TRUE); 
+}
+
+int profundidade(char *pathname, long int *nArqs, long int *tamArqs, int nivel){
+	
+	int count; 
+	struct direct **files;
+	struct stat buf;
+	char pathnameaux[MAXPATHLEN];
+	
+	long int auxnArqs = 0;
+	long int auxtamArqs = 0;
+	
+	int prof = nivel, l;
+	
+	count = scandir(pathname, &files, file_select, alphasort);
+
+	if (count <= 0) return -1;
+	
+	for (int i = 1; i<count + 1; ++i){
+		
+		if(stat(files[i-1]->d_name, &buf) == 1) printf("Erro.\n");
+		
+		if((int)(files[i-1]->d_type) == 4){
+			strcpy(pathnameaux, pathname);
+			strcat(pathnameaux, "/");
+			strcat(pathnameaux, files[i-1]->d_name);
+			l = profundidade(pathnameaux, &auxnArqs, &auxtamArqs, nivel + 1);
+			if(l > prof) prof = l;
+		}
+		
+		auxnArqs++;
+		auxtamArqs += buf.st_size;
+		
+	}
+	
+	*nArqs += auxnArqs;
+	*tamArqs += auxtamArqs;
+	
+	return prof;
+	
+}
+
+int main(void){
+
+	char pathname[MAXPATHLEN];
+
+	long int nArqs = 0, tamArqs = 0;	
+	int prof;
+	
+	if (getcwd(pathname, MAXPATHLEN) == NULL){  
+		printf("Error getting path\n");
+		exit(0);
+	}
+	
+	printf("Current Working Directory = %s\n",pathname);
+	
+	prof = profundidade(pathname, &nArqs, &tamArqs, 0);
+	
+	printf("Numero total de arquivos: %ld\n",nArqs);
+	printf("Tamanho total dos arquivos: %ld\n",tamArqs);
+	printf("Profundidade máxima: %d\n", prof);
+
+	printf("\n"); /* flush buffer */ 
+	
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o listaarquivosex3 listaarquivosex3.c
+$ ./listaarquivosex3
+
+-----------------------------------------------------
+RESULTADO
+
+Current Working Directory = /home/aluno/inf1019
+Numero total de arquivos: 154
+Tamanho total dos arquivos: 502072
+Profundidade máxima: 1
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+
+
+_______________________________________________________________________________________________________
+ 
+4) 
+Modifique o programa anterior para mostrar recursivamente os diretórios e arquivos aninhados.
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <sys/types.h> 
+#include <sys/dir.h> 
+#include <sys/param.h> 
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define FALSE 0 
+#define TRUE 1
+
+
+extern  int alphasort(); 
+char pathname[MAXPATHLEN];
+
+
+int file_select(struct direct *entry) 
+{ 
+    if ((strcmp(entry->d_name, ".") == 0) || (strcmp(entry->d_name, "..") == 0))  
+          return (FALSE); 
+    else 
+          return (TRUE); 
+}
+
+int profundidade(char *pathname, long int *nArqs, long int *tamArqs, int nivel){
+	
+	int count; 
+	struct direct **files;
+	struct stat buf;
+	char pathnameaux[MAXPATHLEN];
+	
+	long int auxnArqs = 0;
+	long int auxtamArqs = 0;
+	
+	int prof = nivel, l;
+	
+	count = scandir(pathname, &files, file_select, alphasort);
+
+	if (count <= 0) return -1;
+	
+	for (int i = 1; i<count + 1; ++i){
+						
+		printf("%*s[%s]\n",4 * nivel, "",files[i-1]->d_name);
+		
+		if(stat(files[i-1]->d_name, &buf) == 1) printf("Erro.\n");
+		
+		if((int)(files[i-1]->d_type) == 4){
+			strcpy(pathnameaux, pathname);
+			strcat(pathnameaux, "/");
+			strcat(pathnameaux, files[i-1]->d_name);
+			l = profundidade(pathnameaux, &auxnArqs, &auxtamArqs, nivel + 1);
+			if(l > prof) prof = l;
+		}
+		
+		auxnArqs++;
+		auxtamArqs += buf.st_size;
+		
+	}
+	
+	*nArqs += auxnArqs;
+	*tamArqs += auxtamArqs;
+	
+	return prof;
+	
+}
+
+int main(void){
+
+	char pathname[MAXPATHLEN];
+
+	long int nArqs = 0, tamArqs = 0;	
+	int prof;
+	
+	if (getcwd(pathname, MAXPATHLEN) == NULL){  
+		printf("Error getting path\n");
+		exit(0);
+	}
+	
+	printf("Current Working Directory = %s\n",pathname);
+	
+	prof = profundidade(pathname, &nArqs, &tamArqs, 0);
+	
+	printf("Numero total de arquivos: %ld\n",nArqs);
+	printf("Tamanho total dos arquivos: %ld\n",tamArqs);
+	printf("Profundidade máxima: %d\n", prof);
+
+	printf("\n"); /* flush buffer */ 
+	
+	return 0;
+}
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -o listaarquivosex4 listaarquivosex4.c
+$ ./listaarquivosex4
+
+-----------------------------------------------------
+RESULTADO
+
+Current Working Directory = /home/aluno/inf1019
+[T1]
+    [escalonador]
+    [escalonador.c]
+    [exec.txt]
+    [fileOUT]
+    [funcoes.c]
+    [funcoes.h]
+    [interpretador]
+    [interpretador.c]
+    [main]
+    [t1]
+    [teste1]
+    [teste1.c]
+    [teste1_IO.c]
+    [teste2]
+    [teste2.c]
+    [teste2_IO.c]
+    [teste3]
+    [teste3.c]
+    [teste3_IO.c]
+[lab01]
+    [alomundo.c]
+    [ex1a.c]
+    [ex1b.c]
+    [ex2.c]
+    [ex3.c]
+    [lab01.txt]
+[lab02]
+    [ex1]
+    [ex1.c]
+    [ex2a]
+    [ex2a.c]
+    [ex2b]
+    [ex2b.c]
+    [ex3]
+    [ex3.c]
+    [lab2.txt]
+    [teste]
+[lab03]
+    [ex1]
+    [ex1.c]
+    [ex3]
+    [ex3.c]
+    [ex4]
+    [ex4.c]
+    [ex5]
+    [ex5.c]
+    [ex6]
+    [ex6.c]
+    [lab03]
+    [lab03.txt]
+    [sleep15]
+    [sleep15.c]
+    [sleep5]
+    [sleep5.c]
+[lab04]
+    [?]
+    [Laboratorio4.txt]
+    [Preader]
+    [Preader.c]
+    [Preader2]
+    [Preader2.c]
+    [Pwriter]
+    [Pwriter.c]
+    [Pwriter2]
+    [Pwriter2.c]
+    [ex1]
+    [ex1.c]
+    [ex1a]
+    [ex1a.c]
+    [ex1b]
+    [ex1b.c]
+    [ex1c]
+    [ex1c.c]
+    [ex3]
+    [ex3.c]
+[lab05]
+    [Laboratorio5.txt]
+    [arqex3]
+    [entrada]
+    [ex1]
+    [ex1.c]
+    [ex2]
+    [ex2.c]
+    [ex3]
+    [ex3.c]
+    [ex4]
+    [ex4.c]
+    [saida]
+[lab06]
+    [Laboratorio6.txt]
+    [ex1]
+    [ex1.c]
+    [ex2]
+    [ex2.c]
+    [ex3]
+    [ex3.c]
+    [ex31]
+    [ex31.c]
+    [ex32]
+    [ex32.c]
+    [lab7.txt]
+[lab07]
+    [Laboratorio7.txt]
+    [ex1a]
+    [ex1a.c]
+    [ex1b]
+    [ex1b.c]
+    [ex2]
+    [ex2.c]
+    [ex3]
+    [ex3.c]
+    [ex3a]
+    [ex3a.c]
+    [ex3b]
+    [ex3b.c]
+    [ex3s]
+    [ex3s.c]
+    [minhaFifo1]
+    [minhaFifo2]
+    [minhaFifo3]
+    [minhaFifo4]
+[lab08]
+    [Laboratorio8]
+    [Laboratorio8.txt]
+    [arq.txt]
+    [ex5]
+    [ex5.c]
+    [ex6]
+    [ex6.c]
+    [map]
+    [map-exemplo.c]
+    [map.c]
+    [myallocate]
+    [myallocate.c]
+    [prog1]
+    [prog1.c]
+    [prog2]
+    [prog2.c]
+[lab09]
+    [Laboratorio9.txt]
+    [ex2lab09]
+    [labarquivo.txt]
+    [listaarquivos]
+    [listaarquivosex1]
+    [listaarquivosex1.c]
+    [listaarquivosex2]
+    [listaarquivosex2.c]
+    [listaarquivosex3]
+    [listaarquivosex3.c]
+    [listaarquivosex4]
+    [listaarquivosex4.c]
+[listaarquivosex3]
+[listaarquivosex4]
+Numero total de arquivos: 154
+Tamanho total dos arquivos: 502072
+Profundidade máxima: 1
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+_______________________________________________________________________________________________________
+ 

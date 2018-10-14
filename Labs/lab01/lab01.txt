@@ -1,0 +1,262 @@
+Bruno Pedrazza – 1412933
+Gerald Cohn – 1711601
+
+1a) 
+   Faça um programa composto por dois processos, processo pai e processo filho, 
+onde: 
+ o Pai - Imprime o seu pid, espera o filho terminar e imprime "Pai finalizado". 
+ o Filho - Imprime o seu pid e o pid do seu pai, e no final imprime "Filho finalizado". 
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+
+int main (void){
+      if (fork() != 0) {
+         printf("pid pai: %d\n",getpid());
+         waitpid( -1, 0, 0);
+         printf("Pai finalizado.\n");
+     
+      } else {
+         printf("pid filho: %d\n",getpid());
+         printf("pid pai : %d\n",getppid());
+         printf("Filho finalizado.\n");
+         exit(0);
+       }
+}
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex1a ex1a.c
+$./ex1a
+
+
+-----------------------------------------------------
+RESULTADO
+
+pid pai: 5220
+pid filho: 5221
+pid pai : 5220
+Filho finalizado.
+Pai finalizado.
+
+-----------------------------------------------------
+CONCLUSÃO
+
+   O programa começa executando o processo pai, imprimindo o propio pid e a partir da funcao waitpid 
+o processo filho passa a funcionar, imprimindo seu respectivo pid e de seu pai. Após o exit, o processo
+volta para o pai, que imprime a frase de finalizacao.
+
+
+1b) 
+Crie processos pai e filho, e 
+• Crie uma variável visível ao pai e ao filho iniciada com 0. 
+• O pai deve somar 50 a esta variável e imprimir: Pai <PID> - <valor>. 
+• O filho deve somar 10 a esta variável e imprimir: Filho <PID> - <valor>. 
+• O pai deve esperar o processo filho terminar e imprimir novamente o valor da 
+variável: Pai após <PID> - <valor>. 
+O que você observou sobre o valor da variável no pai e no filho? Explique o por quê 
+deste comportamento. 
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+
+int main (void){
+
+      int var = 0;
+      if (fork() != 0) {
+         var += 50;
+         printf("Pai %d - %d \n",getpid(), var);
+         waitpid( -1, 0, 0);
+         printf("Pai apos %d - %d \n",getpid(), var);
+     
+      } else {
+         var += 10;
+         printf("Filho %d - %d \n",getpid(), var);
+         exit(0);
+       }
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex1b ex1b.c
+$./ex1b
+
+
+-----------------------------------------------------
+RESULTADO
+
+Pai 5302 - 50 
+Filho 5303 - 10 
+Pai apos 5302 - 50 
+
+-----------------------------------------------------
+CONCLUSÃO
+
+   Foi visto que, como se tratam de dois processos paralelos, ambos enxergam a variavel 
+ e a modificam separadamente, e mesmo com a volta para o pai, a variavel manteve o seu valor original,
+ antes de entrar no processo filho.
+ 
+_______________________________________________________________________________________________________
+ 
+2)
+Faça um programa em que três processos q executam paralelamente as 
+seguintes ações: 
+• Pai - Imprime os números de 1 a 50, com um intervalo de 2 segundos entre 
+cada número. Após imprimir todos os números, imprime a frase “Processo pai 
+vai morrer”. 
+• Filho1 - Imprime os números de 100 a 200, com um intervalo de 1 segundo 
+entre cada número. Antes de imprimir os números, imprime a frase “Filho 1 foi 
+criado”, e após imprimir todos os números, imprime a frase “Filho 1 vai morrer”. 
+• Neto1- (filho do processo Filho1) imprime os números de 300 a 350, com um 
+intervalo de 2 segundos entre cada número. Antes de imprimir os números, 
+imprime a frase “Neto 1 foi criado” Após imprimir todos os números, imprime a 
+frase “Neto 1 vai morrer”. 
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+
+int main (void){
+
+      int var;
+      
+      if (fork() != 0) {
+         printf("Pai %d\n",getpid());
+         for (var = 1; var <= 50; var++){
+            printf("%d\n",var);
+            sleep(2);
+         }
+         printf("Processo pai vai morrer.\n");
+         waitpid( -1, 0, 0);
+     
+      } else {
+         printf("Filho1 foi criado.\n");
+         printf("Filho1 %d\n",getpid());
+         printf("Filho1 pai %d\n",getppid());
+         for (var = 100; var <= 200; var++){
+            printf("%d\n",var);
+            sleep(1);
+         }
+         printf("Filho1 vai morrer.\n");
+         
+         if (fork() != 0){
+            waitpid( -1, 0, 0);
+         
+         } else {
+            printf("Neto1 foi criado.\n");
+            printf("Neto1 %d\n",getpid());
+            printf("Neto1 pai%d\n",getppid());
+            for (var = 300; var <= 350; var++){
+               printf("%d\n",var);
+               sleep(2);
+            }
+            printf("Neto1 vai morrer.\n");
+            exit(0);
+         }       
+         exit(0);
+       }    
+      
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex2 ex2.c
+$./ex2
+
+
+-----------------------------------------------------
+RESULTADO
+
+Pai 5539
+1
+Filho1 foi criado.
+Filho1 5540
+Filho1 pai5539
+100
+101
+2
+102
+103
+3
+104
+105
+4
+106
+107
+......
+
+-----------------------------------------------------
+CONCLUSÃO
+
+   Nesse caso após a função sleep(2), o processo fica parado por 2 segundos, e da a oportunidade para
+   o filho, a partir do waitpid, rodar 2 números do seu for, pois seu sleep é de 1 segundo. Dessa forma,
+   percebemos que com a função sleep os processos ficam atuando ao mesmo tempo e não em paralelo como desejado.
+   Para o neto ser exibido primeiro, deveriamos colocar o waitpid() logo no começo do if do pai e no comeco do
+   if do filho, assim esses processos esperariam o neto acabar para iniciar sua execução, e não haveria 
+   processos sobrepostos pois não estariamos executando a função sleep de cada instância superior antes da
+   inferior acabar.
+   
+__________________________________________________________________________________________
+   
+3) 
+Crie um programa que realize o print da frase: "Alô mundo", no arquivo
+alomundo.c. Compile este programa.
+Em seguida, crie um programa que execute o programa alomundo criado por
+você. 
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <unistd.h>
+#include <stdio.h>
+
+int main (void){
+	execv ("./alomundo",0);
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o alomundo alomundo.c
+$ gcc -Wall -o ex3 ex3.c
+$ ./ex3
+
+
+-----------------------------------------------------
+RESULTADO
+
+Alo mundo!
+
+-----------------------------------------------------
+CONCLUSÃO
+
+	Concluimos que a função execv executou o programa alomundo que já estava compilado anteriormente, imprimindo
+corretamente o que o programa alomundo propunha.
+
+
+
+
+
+

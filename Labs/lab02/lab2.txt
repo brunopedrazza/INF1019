@@ -1,0 +1,324 @@
+Bruno Pedrazza – 1412933
+Gerald Cohn – 1711601
+
+1) 
+   Faça um programa para somar matrizes de acordo com o seguinte algoritmo
+- O primeiro processo irá criar duas matrizes preenchidas e uma terceira
+  vazia em 3 áreas de memória compartilhada.
+- Para cada linha da matriz solução, o seu programa deverá gerar um 
+  processo para o seu cálculo.  
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <sys/ipc.h> 
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+
+int main (void){
+	int seg1, seg2, seg3, *m1, *m2, *m3, id, status; 
+	// aloca a memória compartilhada
+	seg1 = shmget (IPC_PRIVATE, 4*sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	seg2 = shmget (IPC_PRIVATE, 4*sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	seg3 = shmget (IPC_PRIVATE, 4*sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+
+	// associa a memória compartilhada ao processo
+	m1 = (int *) shmat (seg1, 0, 0);
+	m2 = (int *) shmat (seg2, 0, 0);
+	m3 = (int *) shmat (seg3, 0, 0);
+
+
+//Preencher matrizes
+	*m1 = 2;
+	*(m1+sizeof(int)) = 3;
+	*(m1+2*sizeof(int)) = 4;
+	*(m1+3*sizeof(int)) = 5;
+
+	*m2 = 1; 
+	*(m2+sizeof(int)) = 2;
+	*(m2+2*sizeof(int)) = 11;
+	*(m2+3*sizeof(int)) = 55;
+
+	// comparar o retorno com -1
+	
+	printf("Matriz Soma:\n");
+	
+	if ((id = fork()) < 0) { 
+		puts ("Erro na criação do novo processo"); 
+		exit (-2); 
+	} 
+
+	else if (id == 0) { 
+		*m3 = *m1 + *m2; 
+		*(m3+4) = *(m1+4) + *(m2+4); 
+		printf("%d \t %d\n", *(m3), *(m3+sizeof(int))); 	
+	}
+
+	else{ 
+		wait (&status); 
+		*(m3+8) = *(m1+8) + *(m2+8); 
+		*(m3+12) = *(m1+12) + *(m2+12); 	
+		printf("%d \t %d\n", *(m3+2*sizeof(int)), *(m3+3*sizeof(int))); 	
+	} 
+
+
+	// libera a memória compartilhada do processo
+	shmdt (m1);
+	shmdt (m2);
+	shmdt (m3); 
+
+	// libera a memória compartilhada
+	shmctl (seg1, IPC_RMID, 0); 
+	shmctl (seg2, IPC_RMID, 0); 
+	shmctl (seg3, IPC_RMID, 0);
+
+	return 0;
+	
+} 
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex1 ex1.c
+$./ex1
+
+
+-----------------------------------------------------
+RESULTADO
+
+Matriz Soma:
+3 	 5
+15 	 60
+
+
+-----------------------------------------------------
+CONCLUSÃO
+
+	Como utilizamos uma memória compartilhada, os processos conseguem se comunicar através dessa memória em comum, 
+obtendo a matriz soma a partir da soma parcial das linhas dividida entre os processos pai e filho.
+   
+_______________________________________________________________________________________________________
+ 
+2)
+  Faça um programa que:
+  - Leia uma mensagem do dia do stdin (ou arquivo)
+  - Crie uma memória compartilhada com a chave 8752
+  - Salve a mensagem na memória
+  
+  Faça um outro programa “cliente” que utilize a mesma chave (8752) e exiba a mensagem
+  do dia para o usuário.
+-----------------------------------------------------
+ARQUIVO.C
+
+Programa principal:
+
+#include<sys/ipc.h> 
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include <string.h>
+
+
+int main (void){
+ 
+	int seg1; 
+	char *m1;
+	char *m2 = "Bom dia";
+	
+	// aloca a memória compartilhada
+	
+	seg1 = shmget (8772, 15*sizeof (char), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR); 
+	
+	if(seg1 == -1) {
+		printf("Erro\n");
+		exit(1);
+	}
+	
+	// associa a memória compartilhada ao processo
+	
+	m1 = (char *) shmat (seg1, 0, 0);
+	
+	strcpy(m1, m2);
+
+	
+	// libera a memória compartilhada do processo
+	shmdt (m1);
+
+	return 0;
+} 
+
+Programa cliente:
+
+#include<sys/ipc.h> 
+#include<sys/shm.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<sys/wait.h>
+#include<stdio.h>
+#include<stdlib.h>
+
+
+int main (void){ 
+
+	int seg1; 
+	char *m1;
+
+	seg1 = shmget (8772, 15*sizeof (char), S_IRUSR | S_IWUSR);
+	
+	if(seg1 == -1) {
+		printf("Erro\n");
+		exit(1);
+	}
+	
+	// associa a memória compartilhada ao processo
+	m1 = (char *) shmat (seg1, 0, 0);
+
+	printf("Mensagem do dia: \n %s\n", m1);
+
+	// libera a memória compartilhada do processo
+	shmdt (m1);
+
+	// libera a memória compartilhada
+	shmctl (seg1, IPC_RMID, 0); 
+
+	return 0;
+} 
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex2a ex2a.c
+$ gcc -Wall -o ex2b ex2b.c
+$./ex2a
+$./ex2b
+
+-----------------------------------------------------
+RESULTADO
+
+Mensagem do dia: 
+ Bom dia
+ 
+-----------------------------------------------------
+CONCLUSÃO
+
+	O programa principal utiliza uma identificação conhecida para armezenar nessa 
+	posição de memória a string de mensagem do dia. O programa cliente por sua vez consegue 
+	acessar essa mesma área compartilhada pelo identificador conhecido, sendo possível imprimir 
+	a mensagem escrita pelo outro programa.
+   
+__________________________________________________________________________________________
+   
+3) 
+ Faça um programa paralelo para localizar uma chave em um vetor.
+ - Crie uma memória compartilhada com dados numéricos inteiros e desordenados e a divida
+   pelo número de processos
+ - Cada processo deve procurar o dado na sua área de memória e informar a posição onde o
+   dado foi localizado. 
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <sys/ipc.h> 
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int busca (int* v, int tam, int chave){
+	int i;
+	for (i=0;i<tam;i++){
+		if (*(v + i*sizeof(int)) == chave){
+			return i;
+			}
+		}
+
+	return -1;
+}
+
+int main (void){
+	int seg1, *m1, id, status, i, pos; 
+	int chave = 19;
+	// aloca a memória compartilhada
+	seg1 = shmget (IPC_PRIVATE, 4*sizeof (int), IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+	
+	if(seg1 == -1) {
+		printf("Erro\n");
+		exit(1);
+	}
+
+	// associa a memória compartilhada ao processo
+	m1 = (int *) shmat (seg1, 0, 0);
+
+//Preencher matrizes
+	*m1 = 12;
+	*(m1+ sizeof(int)) = 5;
+	*(m1+ 2*sizeof(int)) = 32;
+	*(m1+ 3*sizeof(int)) = 19;
+	
+
+	for (i = 0; i<2;i++){
+		if ((id = fork()) < 0) { 
+			puts ("Erro na criação do novo processo"); 
+			exit (-2); 
+		} 
+
+		else if (id == 0) { 
+			pos = busca(m1 + (i*2)*(sizeof(int)),2,chave);
+			else printf("Processo numero: %d\nPosicao: %d\n", i+1, pos + i*2);
+			
+			shmdt(m1);
+			exit(0);
+		}
+
+		else wait (&status); 
+	} 
+
+	// libera a memória compartilhada do processo
+	shmdt (m1);
+
+	// libera a memória compartilhada
+	shmctl (seg1, IPC_RMID, 0); 
+
+	return 0;
+	
+} 
+
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex3 ex3.c
+$ ./ex3
+
+-----------------------------------------------------
+RESULTADO
+
+Chave nao encontrada no processo 1.
+Processo numero: 2
+Posicao: 3
+
+
+-----------------------------------------------------
+CONCLUSÃO
+
+	Utilizando uma busca em paralelo, ou seja, dividindo a busca entre diferentes processos, 
+	foi possível agilizar o tempo de busca, pois cada processo ficou "responsável" pela localizacao 
+	da chave dada em uma parcela do vetor.
+	
+
+
+
+
+
+
+

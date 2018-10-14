@@ -1,0 +1,617 @@
+Bruno Pedrazza – 1412933
+Gerald Cohn – 1711601
+
+1) Faça um programa que usa myallocate para alocar e desalocar memória dinamicamente.
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h> 
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/mman.h> 
+
+
+void * memorypool;
+
+void *myallocate( int n){
+    return brk(n);
+}
+
+void initmemorypool(void) {
+	memorypool = sbrk(0);
+}
+
+void resetmemorypool(void){
+	brk(memorypool);
+} 
+
+int main (){
+	int *p;
+	initmemorypool();
+	p = (int*)memorypool;
+	myallocate(p+100);
+	resetmemorypool();
+
+	return 0;
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o myallocate myallocate.c
+$ ./myallocate
+
+-----------------------------------------------------
+RESULTADO
+
+Nada aparece no terminal.
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+_______________________________________________________________________________________________________
+ 
+2)
+Execute map-exemplo.c passando o nome de um arquivo como parâmetro. 
+Qual foi a novidade?
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h> 
+#include <stdlib.h>
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/mman.h> 
+#include <math.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/sem.h>
+#include <string.h>
+
+int main (int argc, char *argv[]){
+
+	struct stat sb;
+	off_t len;
+  char *p;   
+  int fd;
+  
+  if (argc < 2) { fprintf (stderr, "usage: %s <file>\n",    argv[0]); exit(1); }
+  fd = open (argv[1], O_RDONLY);
+  if (fd == -1) { perror ("open"); exit(1); }                 
+  if (fstat(fd, &sb)== -1) { perror ("fstat"); exit(1); }
+  if (!S_ISREG (sb.st_mode)) { fprintf (stderr, "%s is not a file\n", argv[1]); exit(1);}
+  
+  p = mmap (0, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+  if (p == MAP_FAILED)  { perror ("mmap"); exit(1);  }
+  
+  if (close (fd) == -1) { perror ("close"); exit(1); }
+  
+  for (len = 0; len < sb.st_size; len++) putchar (p[len]);
+  
+  if (munmap  (p, sb.st_size) == -1) {perror ("munmap"); exit(1); }       
+  return 0;
+}
+
+arq.txt
+
+BRUNOGERALD
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o map-exemplo map-exemplo.c
+$ ./map-exemplo arq.txt
+
+-----------------------------------------------------
+RESULTADO
+
+BRUNOGERALD
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+__________________________________________________________________________________________
+   
+3) 
+Modifique map-exemplo.c para: 
+a.Verificar quantas páginas de memória o seu arquivo precisou
+b.Medir o quão mais rápido foi a escrita do arquivo mapeado quando comparado com a E/S em disco. Dica: use gettimeofday() 
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/mman.h> 
+#include <sys/time.h> 
+#include <utime.h> 
+
+
+int main (int argc, char *argv[]){
+	struct stat sb;
+	off_t len;
+	char *p;   
+	int fd, pag;
+	long int t1,t2;
+
+	struct timeval start, stop;
+
+	if (argc < 2) { 
+		fprintf (stderr, "usage: %s <file>\n", argv[0]); exit(1);
+	}
+
+	fd = open (argv[1], O_RDONLY);
+  	if (fd == -1) {
+		perror ("open"); exit(1); 
+	} 
+                
+    if (fstat(fd, &sb)== -1) { 
+		perror ("fstat"); exit(1); }
+
+    if (!S_ISREG (sb.st_mode)) { 
+		fprintf (stderr, "%s is not a file\n", argv[1]); exit(1);
+	}
+
+	gettimeofday(&start, NULL);
+    p = mmap (0, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	gettimeofday(&stop, NULL);
+    
+	if (p == MAP_FAILED)  { 
+		perror ("mmap"); exit(1);  
+	}
+
+    if (close (fd) == -1) { 
+		perror ("close"); exit(1); 
+	}
+	
+	t1 = stop.tv_usec - start.tv_usec;
+	gettimeofday(&start, NULL);
+    for (len = 0; len < sb.st_size; len++) putchar (p[len]);
+	gettimeofday(&stop, NULL);
+	t2 = stop.tv_usec - start.tv_usec;
+
+
+	pag = sb.st_size/getpagesize();
+
+	printf("Numero de paginas ocupadas pelo arquivo %d\n", pag+1);
+	printf("Tempo de escrita memoria %ld\n", t1);
+	printf("Tempo de escrita disco %ld\n", t2);
+
+
+    if (munmap  (p, sb.st_size) == -1) {
+		perror ("munmap"); 
+		exit(1); 
+	}  
+     
+	return 0;
+}
+
+arq.txt
+
+BRUNOGERALD
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex3 ex3.c
+$ ./ex3 arq.txt
+
+-----------------------------------------------------
+RESULTADO
+
+BRUNOGERALD
+Numero de paginas ocupadas pelo arquivo 1
+Tempo de escrita memoria 3
+Tempo de escrita disco 10
+
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+__________________________________________________________________________________________
+
+4) 
+Escreva dois programas prog1.c e prog2.c que trocam dados através de um mesmo arquivo mapeado para memória (de cada um).
+
+-----------------------------------------------------
+ARQUIVO.C
+
+prog1.c
+
+#include <stdio.h> 
+#include <stdlib.h>
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/mman.h> 
+#include <math.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/sem.h>
+#include <string.h>
+
+#define TAM 10
+
+union semun { 
+	int val; 
+	struct semid_ds *buf; 
+	ushort *array; 
+};
+
+int setSemValue(int semId) { 
+	union semun semUnion; 
+	semUnion.val = 1; 
+	return semctl(semId, 0, SETVAL, semUnion); 
+}
+
+void delSemValue(int semId) { 
+	union semun semUnion; 
+	semctl(semId, 0, IPC_RMID, semUnion); 
+}
+
+int semaforoP(int semId) { 
+	struct sembuf semB; 
+	semB.sem_num = 0; 
+	semB.sem_op = -1; 
+	semB.sem_flg = SEM_UNDO; 
+	semop(semId, &semB, 1); 
+	return 0; 
+}
+
+int semaforoV(int semId) { 
+	struct sembuf semB; 
+	semB.sem_num = 0; 
+	semB.sem_op = 1; 
+	semB.sem_flg = SEM_UNDO; 
+	semop(semId, &semB, 1); 
+	return 0; 
+}
+
+
+int main(void){
+
+	char *p;
+	int fd, semId, i;
+	struct stat sb;
+	char str[] = "BRUNOGERALD";
+	
+	semId = semget (8200, 1, 0666 | IPC_CREAT); 
+	setSemValue(semId);
+	
+	fd = open("arq.txt", O_RDWR|O_CREAT|O_TRUNC, S_IRUSR|S_IWUSR);
+	
+	if (fd == -1){perror ("open"); exit(1);}      
+   	
+  lseek(fd,TAM,SEEK_SET);
+   	
+  write(fd, "", sizeof(char));
+   	
+  if (fstat(fd, &sb)== -1){perror ("fstat"); exit(1);}
+	
+	printf("Quantidade de caracteres: %ld\n", sb.st_size);
+	
+	p = mmap (0, TAM, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	
+	if (p == MAP_FAILED){perror ("mmap"); exit(1);}
+	
+  printf("Inicio da escrita\n");
+  
+   	
+  for(i = 0; i < 11; i++){
+  	semaforoP(semId);
+ 		p[i] = str[i];
+ 		msync(p, getpagesize(), MS_SYNC);   
+ 		sleep(1);		
+ 		semaforoV(semId);
+  }
+   
+  printf("Final\n");
+
+  delSemValue(semId);
+  
+  if (munmap  (p, TAM) == -1){perror ("munmap"); exit(1);}       
+   	
+  close(fd);
+   	
+  return 0;
+   	
+}
+
+prog2.c
+
+#include <stdio.h> 
+#include <stdlib.h>
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/mman.h> 
+#include <math.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/sem.h>
+
+union semun { 
+	int val; 
+	struct semid_ds *buf; 
+	ushort *array; 
+};
+
+int setSemValue(int semId) { 
+	union semun semUnion; 
+	semUnion.val = 1; 
+	return semctl(semId, 0, SETVAL, semUnion); 
+}
+
+void delSemValue(int semId) { 
+	union semun semUnion; 
+	semctl(semId, 0, IPC_RMID, semUnion); 
+}
+
+
+int semaforoP(int semId) { 
+	struct sembuf semB; 
+	semB.sem_num = 0; 
+	semB.sem_op = -1; 
+	semB.sem_flg = SEM_UNDO; 
+	semop(semId, &semB, 1); 
+	return 0; 
+}
+
+int semaforoV(int semId) { 
+	struct sembuf semB; 
+	semB.sem_num = 0; 
+	semB.sem_op = 1; 
+	semB.sem_flg = SEM_UNDO; 
+	semop(semId, &semB, 1); 
+	return 0; 
+}
+
+int main(void){
+
+	char *p;
+	int fd, semId, i;
+	struct stat sb;
+	
+	semId = semget (8200, 1, 0666);
+	
+	fd = open("arq.txt", O_RDWR);
+	
+	if (fd == -1){perror ("open"); exit(1);}    
+   	
+  if (fstat(fd, &sb)== -1){perror ("fstat"); exit(1);}
+
+	p = mmap (0, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	
+	if (p == MAP_FAILED){perror ("mmap"); exit(1);}
+	
+  printf("Inicio da leitura\n");
+  
+  for(i = 0; i < 11; i++){
+   semaforoP(semId);
+   printf("%c\n", p[i]);		
+   semaforoV(semId);
+  }
+  
+  printf("Final da leitura\n");
+   	
+  delSemValue(semId);
+  
+  if (munmap  (p, sb.st_size) == -1){ perror ("munmap"); exit(1);}      
+  
+  close(fd);
+   	
+  return 0;
+   	
+}
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+Terminal 1:
+$ gcc -Wall -o prog1 prog1.c
+$ ./prog1
+
+Terminal 2:
+$ gcc -Wall -o prog2 prog2.c
+$ ./prog2
+
+-----------------------------------------------------
+RESULTADO
+
+Terminal 1:
+Quantidade de caracteres: 11
+Inicio da escrita
+Final
+
+Terminal 2:
+Inicio da leitura
+B
+R
+U
+N
+O
+G
+E
+R
+A
+L
+D
+Final da leitura
+
+
+-----------------------------------------------------
+CONCLUSÃO
+
+__________________________________________________________________________________________
+
+5)
+Escreva um programa que faz um mapeamento de arquivo para memória e depois escreve novos caracteres no final do arquivo. O que voce precisa fazer para evitar um SegFault? 
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#include <stdio.h> 
+#include <stdlib.h>
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/mman.h> 
+#include <math.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <string.h>
+
+int main(void){
+
+	char *p;
+	int fd;
+	struct stat sb;
+	char str[] = "lab08 divertido ";
+
+	fd = open("arq.txt", O_RDWR, S_IRUSR|S_IWUSR);
+	
+	if (fd == -1){ perror ("open"); exit(1);}    
+   	
+  if (fstat(fd, &sb)== -1){ perror ("fstat"); exit(1);}
+	   	
+  lseek(fd, strlen(str)-1 ,SEEK_END);
+   	  	
+  write(fd, "", sizeof(char));
+
+	p = mmap (0, sb.st_size + strlen(str), PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	
+	if (p == MAP_FAILED){ perror ("mmap"); exit(1); }
+
+	strcpy(&p[sb.st_size], str);
+	
+	// para a sincronizacao da memoria com o arquivo
+	msync(p, strlen(str) + sb.st_size, MS_SYNC);
+		
+  printf("Escreveu corretamente\n");
+   		
+  if (munmap  (p, strlen(str)) == -1){ perror ("munmap"); exit(1);}       
+
+  close(fd);
+  return 0;	
+ 	
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex5 ex5.c
+$ ./ex5
+
+-----------------------------------------------------
+RESULTADO
+
+Escreveu corretamente
+
+arq.txt:
+lab08 divertido
+
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+__________________________________________________________________________________________
+
+6) 
+Re-escreva o seu programa do item anterior usandomremap()
+
+-----------------------------------------------------
+ARQUIVO.C
+
+#define _GNU_SOURCE
+
+#include <stdio.h> 
+#include <stdlib.h>
+#include <sys/types.h> 
+#include <sys/stat.h> 
+#include <fcntl.h> 
+#include <unistd.h> 
+#include <sys/mman.h> 
+#include <math.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <string.h>
+
+
+int main(void){
+
+	char *p;
+	int fd;
+	struct stat sb;
+	char str[] = "lab08 divertido ";
+	
+	fd = open("arq.txt", O_RDWR, S_IRUSR|S_IWUSR);
+	
+	if (fd == -1){ perror ("open"); exit(1);}    
+   	
+  if (fstat(fd, &sb)== -1){ perror ("fstat"); exit(1);}
+	   	
+	lseek(fd, strlen(str)-1,SEEK_END);
+   	  	
+  write(fd, "", sizeof(char));   	  	
+   	
+	p = mmap (0, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	
+	if (p == MAP_FAILED){ perror ("mmap"); exit(1);}
+   	
+  p = mremap(p, sb.st_size, sb.st_size + strlen(str), 0);
+
+	strcpy(&p[sb.st_size], str);
+	
+	// para a sincronizacao da memoria com o arquivo
+	msync(p, strlen(str) + sb.st_size, MS_SYNC);
+	
+  printf("Escreveu corretamente\n");
+   	
+  if (munmap  (p, strlen(str)) == -1){ perror ("munmap"); exit(1);}
+   	
+  close(fd);
+  return 0;	
+   	  	
+}
+
+-----------------------------------------------------
+COMPILAÇÃO E EXECUÇÃO
+
+$ gcc -Wall -o ex6 ex6.c
+$ ./ex6
+
+-----------------------------------------------------
+RESULTADO
+
+Escreveu corretamente
+
+arq.txt:
+lab08 divertido
+
+-----------------------------------------------------
+CONCLUSÃO
+
+
+
+
+__________________________________________________________________________________________
